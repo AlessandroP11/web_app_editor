@@ -320,6 +320,81 @@ function getRandomColor() {
 
   <script>
 
+    
+
+$(document).ready(function () {
+      // Add a "Clear All" button to the navbar
+      const clearAllButton = $('<button id="clear-all">Clear All</button>').css({
+        marginLeft: "10px",
+        backgroundColor: "#ff5555",
+        color: "#f8f8f2",
+      });
+      $(".navbar div").append(clearAllButton);
+
+      // Attach functionality to clear all editors
+      $("#clear-all").on("click", function () {
+        // Confirm before clearing
+        const confirmClear = confirm("Are you sure you want to clear all sections?");
+        if (confirmClear) {
+          htmlEditor.setValue(""); // Clear HTML editor
+          cssEditor.setValue("");  // Clear CSS editor
+          jsEditor.setValue("");   // Clear JS editor
+        }
+      });
+    });
+
+    // Function to handle loading a zip folder
+    function loadZip() {
+      const fileInput = $('<input type="file" accept=".zip" style="display: none;">');
+      $("body").append(fileInput);
+
+      fileInput.on("change", function (event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const zip = new JSZip();
+        const reader = new FileReader();
+
+        reader.onload = function (e) {
+          zip.loadAsync(e.target.result).then(function (contents) {
+            // Extract HTML, CSS, and JS files
+            if (contents.files["index.html"]) {
+              zip.file("index.html").async("string").then(function (htmlContent) {
+                htmlEditor.setValue(htmlContent);
+              });
+            }
+            if (contents.files["styles.css"]) {
+              zip.file("styles.css").async("string").then(function (cssContent) {
+                cssEditor.setValue(cssContent);
+              });
+            }
+            if (contents.files["script.js"]) {
+              zip.file("script.js").async("string").then(function (jsContent) {
+                jsEditor.setValue(jsContent);
+              });
+            }
+          });
+        };
+
+        reader.readAsArrayBuffer(file);
+      });
+
+      // Trigger the file input dialog
+      fileInput.click();
+    }
+
+    $(document).ready(function () {
+      // Add a "Load ZIP" button to the navbar
+      const loadZipButton = $('<button id="load-zip">Load ZIP</button>').css({
+        marginLeft: "10px",
+        backgroundColor: "#8be9fd",
+      });
+      $(".navbar div").append(loadZipButton);
+
+      // Attach the loadZip function to the button
+      $("#load-zip").on("click", loadZip);
+    });
+
     // Add a settings panel for user preferences
     function initializeSettings() {
       const settingsPanel = $('<div class="settings-panel"></div>').css({
