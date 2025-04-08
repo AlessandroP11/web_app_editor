@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enhanced Code Editor</title>
+  <!-- CodeMirror for Syntax Highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closetag.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/lint/lint.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/lint/javascript-lint.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/lint/css-lint.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/lint/html-lint.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/lint/lint.min.css">
+  
+  <!-- JSZip for export functionality -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background-color: #282c34;
+      color: #abb2bf;
+    }
+
+    .navbar {
+      background-color: #21252b;
+      color: white;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo i {
+      font-size: 1.5rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      background-color: #4d78cc;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn:hover {
+      background-color: #5a88db;
+    }
+
+    .btn-success {
+      background-color: #98c379;
+    }
+
+    .btn-success:hover {
+      background-color: #a6d08c;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .preview-container {
+      flex: 1;
+      background-color: #1e1e1e;
+      border: 1px solid #181a1f;
+      border-radius: 4px;
+      margin: 1rem;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .preview {
+      width: 100%;
+      height: 100%;
+      background-color: white;
+      border: none;
+    }
+
+    .console {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 30%;
+      background-color: #1e1e1e;
+      border-top: 1px solid #181a1f;
+      color: #abb2bf;
+      font-family: monospace;
+      padding: 10px;
+      overflow: auto;
+      display: none;
+      z-index: 10;
+    }
+
+    .console-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #333;
+      margin-bottom: 10px;
+    }
+
+    .console-close {
+      cursor: pointer;
+      color: #abb2bf;
+    }
+
+    .console-content {
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+
+    .console-error {
+      color: #e06c75;
+    }
+
+    .console-warn {
+      color: #e5c07b;
+    }
+
+    .console-info {
+      color: #61afef;
+    }
+
+    .editors {
+      display: flex;
+      flex: 1;
+      gap: 0.5rem;
+      padding: 0 1rem 1rem 1rem;
+    }
+
+    .editor {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: #21252b;
+      border: 1px solid #181a1f;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .editor-header {
+      background-color: #2c313a;
+      padding: 0.5rem;
+      font-weight: bold;
+      border-bottom: 1px solid #181a1f;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .editor-title {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .editor-actions {
+      display: flex;
+      gap: 5px;
+    }
+
+    .editor-actions button {
+      background-color: transparent;
+      color: #abb2bf;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      transition: all 0.2s;
+    }
+
+    .editor-actions button:hover {
+      background-color: #383e4a;
+    }
+
+    .CodeMirror {
+      flex: 1;
+      height: auto;
+      font-size: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .editors {
+        flex-direction: column;
+        height: auto;
+      }
+      
+      .container {
+        height: auto;
+      }
+      
+      .preview-container {
+        height: 300px;
+      }
+      
+      .editor {
+        height: 200px;
+      }
+    }
+
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background-color: #282c34;
+      border-radius: 8px;
+      padding: 20px;
+      width: 500px;
+      max-width: 90%;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #3e4452;
+      padding-bottom: 10px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #abb2bf;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .modal-body {
+      margin-bottom: 20px;
+    }
+
+    .modal-body input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #3e4452;
+      border-radius: 4px;
+      background-color: #21252b;
+      color: #abb2bf;
+      margin-bottom: 10px;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Console log styles */
+    .log-item {
+      margin-bottom: 5px;
+      padding: 3px 0;
+      border-bottom: 1px solid #333;
+    }
+
+    .log-time {
+      color: #777;
+      font-size: 0.8rem;
+      margin-right: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <div class="logo">
+      <span>Enhanced Code Editor</span>
+    </div>
+    <div class="actions">
+      <button id="debug-btn" class="btn">
+        <span>Debug</span>
+      </button>
+      <button id="run-btn" class="btn btn-success">
+        <span>Run</span>
+      </button>
+      <button id="save-btn" class="btn">
+        <span>Save Project</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="preview-container">
+      <iframe id="preview" class="preview"></iframe>
+      <div id="console" class="console">
+        <div class="console-header">
+          <span>Console</span>
+          <span class="console-close" id="console-close">×</span>
+        </div>
+        <div class="console-content" id="console-content"></div>
+      </div>
+    </div>
+
+    <div class="editors">
+      <div class="editor">
+        <div class="editor-header">
+          <div class="editor-title">
+            <span>HTML</span>
+          </div>
+          <div class="editor-actions">
+            <button id="validate-html">Validate</button>
+            <button id="run-html">Run</button>
+          </div>
+        </div>
+        <textarea id="html-editor">&lt;h1&gt;Hello World!&lt;/h1&gt;
+&lt;p&gt;Welcome to the enhanced code editor.&lt;/p&gt;
+&lt;button id="test-button"&gt;Click me!&lt;/button&gt;
+&lt;div id="output"&gt;&lt;/div&gt;</textarea>
+      </div>
+
+      <div class="editor">
+        <div class="editor-header">
+          <div class="editor-title">
+            <span>CSS</span>
+          </div>
+          <div class="editor-actions">
+            <button id="validate-css">Validate</button>
+            <button id="run-css">Run</button>
+          </div>
+        </div>
+        <textarea id="css-editor">body {
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+  padding: 20px;
+  color: #333;
+  background-color: #f8f8f8;
+}
+
+h1 {
+  color: #4CAF50;
+  border-bottom: 2px solid #eaeaea;
+  padding-bottom: 10px;
+}
+
+button {
+  background-color: #008CBA;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #005f7f;
+}
+
+#output {
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fff;
+  min-height: 100px;
+}</textarea>
+      </div>
+
+      <div class="editor">
+        <div class="editor-header">
+          <div class="editor-title">
+            <span>JavaScript</span>
+          </div>
+          <div class="editor-actions">
+            <button id="validate-js">Validate</button>
+            <button id="run-js">Run</button>
+          </div>
+        </div>
+        <textarea id="js-editor">// Log a message to see the console working
+console.log("Script initialized");
+
+// Get the button and output elements
+const testButton = document.getElementById('test-button');
+const output = document.getElementById('output');
+
+// Counter for button clicks
+let clickCount = 0;
+
+// Add event listener to the button
+testButton.addEventListener('click', function() {
+  // Increment counter
+  clickCount++;
+  
+  // Log to console
+  console.log(`Button clicked ${clickCount} times`);
+  
+  // Change heading color
+  const heading = document.querySelector('h1');
+  const newColor = getRandomColor();
+  
+  // Update heading
+  heading.style.color = newColor;
+  
+  // Update output area
+  output.innerHTML += `<p>Click #${clickCount}: Changed heading color to ${newColor}</p>`;
+  
+  // Try to catch errors
+  try {
+    if (clickCount === 3) {
+      // Intentional error for demonstration
+      console.warn("Careful! You're about to trigger an error on the next click!");
+    }
+    
+    if (clickCount === 4) {
+      throw new Error("This is a demonstration error!");
+    }
+  } catch (error) {
+    console.error("Error caught:", error.message);
+    output.innerHTML += `<p style="color: red">Error: ${error.message}</p>`;
+  }
+});
+
+// Generate random color
+function getRandomColor() {
+  const letters = '0123456789ABCDEF';
+  let color = '#';
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Project Modal -->
+  <div id="save-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Save Project</h3>
+        <button class="modal-close" id="save-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label for="project-name">Project Name:</label>
+        <input type="text" id="project-name" placeholder="my-awesome-project" value="my-project">
+      </div>
+      <div class="modal-footer">
+        <button id="cancel-save" class="btn">Cancel</button>
+        <button id="confirm-save" class="btn btn-success">Download ZIP</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize CodeMirror editors
+    const htmlEditor = CodeMirror.fromTextArea(document.getElementById('html-editor'), {
+      mode: 'htmlmixed',
+      theme: 'monokai',
+      lineNumbers: true,
+      autoCloseTags: true,
+      autoCloseBrackets: true,
+      tabSize: 2,
+      lineWrapping: true,
+      gutters: ["CodeMirror-lint-markers"],
+      lint: true
+    });
+
+    const cssEditor = CodeMirror.fromTextArea(document.getElementById('css-editor'), {
+      mode: 'css',
+      theme: 'monokai',
+      lineNumbers: true,
+      autoCloseBrackets: true,
+      tabSize: 2,
+      lineWrapping: true,
+      gutters: ["CodeMirror-lint-markers"],
+      lint: true
+    });
+
+    const jsEditor = CodeMirror.fromTextArea(document.getElementById('js-editor'), {
+      mode: 'javascript',
+      theme: 'monokai',
+      lineNumbers: true,
+      autoCloseBrackets: true,
+      tabSize: 2,
+      lineWrapping: true,
+      gutters: ["CodeMirror-lint-markers"],
+      lint: true
+    });
+
+    // DOM Elements
+    const preview = document.getElementById('preview');
+    const runHtmlBtn = document.getElementById('run-html');
+    const runCssBtn = document.getElementById('run-css');
+    const runJsBtn = document.getElementById('run-js');
+    const runBtn = document.getElementById('run-btn');
+    const debugBtn = document.getElementById('debug-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const consoleElement = document.getElementById('console');
+    const consoleContent = document.getElementById('console-content');
+    const consoleClose = document.getElementById('console-close');
+    const validateHtmlBtn = document.getElementById('validate-html');
+    const validateCssBtn = document.getElementById('validate-css');
+    const validateJsBtn = document.getElementById('validate-js');
+    
+    // Modal elements
+    const saveModal = document.getElementById('save-modal');
+    const saveModalClose = document.getElementById('save-modal-close');
+    const cancelSave = document.getElementById('cancel-save');
+    const confirmSave = document.getElementById('confirm-save');
+    const projectNameInput = document.getElementById('project-name');
+
+    // Initialize the preview
+    updatePreview();
+
+    // Event listeners for the run buttons
+    runHtmlBtn.addEventListener('click', updatePreview);
+    runCssBtn.addEventListener('click', updatePreview);
+    runJsBtn.addEventListener('click', updatePreview);
+    runBtn.addEventListener('click', updatePreview);
+
+    // Debug button
+    debugBtn.addEventListener('click', function() {
+      if (consoleElement.style.display === 'block') {
+        consoleElement.style.display = 'none';
+      } else {
+        consoleElement.style.display = 'block';
+      }
+    });
+
+    // Close console
+    consoleClose.addEventListener('click', function() {
+      consoleElement.style.display = 'none';
+    });
+
+    // Validation buttons
+    validateHtmlBtn.addEventListener('click', function() {
+      validateCode('html', htmlEditor.getValue());
+    });
+    
+    validateCssBtn.addEventListener('click', function() {
+      validateCode('css', cssEditor.getValue());
+    });
+    
+    validateJsBtn.addEventListener('click', function() {
+      validateCode('js', jsEditor.getValue());
+    });
+
+    // Save button
+    saveBtn.addEventListener('click', function() {
+      saveModal.style.display = 'flex';
+    });
+
+    // Modal close button
+    saveModalClose.addEventListener('click', function() {
+      saveModal.style.display = 'none';
+    });
+
+    // Cancel save button
+    cancelSave.addEventListener('click', function() {
+      saveModal.style.display = 'none';
+    });
+
+    // Confirm save button
+    confirmSave.addEventListener('click', function() {
+      exportProject();
+      saveModal.style.display = 'none';
+    });
+
+    // Close modal if clicked outside
+    window.addEventListener('click', function(event) {
+      if (event.target === saveModal) {
+        saveModal.style.display = 'none';
+      }
+    });
+
+    // Function to export the project as a ZIP file
+    function exportProject() {
+      const zip = new JSZip();
+      const projectName = projectNameInput.value.trim() || 'my-project';
+      
+      // Add files to the zip
+      zip.file("index.html", createFullHtml());
+      zip.file("styles.css", cssEditor.getValue());
+      zip.file("script.js", jsEditor.getValue());
+      
+      // Generate the zip file
+      zip.generateAsync({ type: "blob" }).then(function(content) {
+        // Use FileSaver to save the file
+        saveAs(content, `${projectName}.zip`);
+      });
+    }
+
+    // Create a complete HTML file for export
+    function createFullHtml() {
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${projectNameInput.value || 'My Project'}</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+${htmlEditor.getValue()}
+  <script src="script.js"></script>
+</body>
+</html>`;
+    }
+
+    // Function to validate code
+    function validateCode(type, code) {
+      let errors = [];
+      let warnings = [];
+      
+      if (type === 'html') {
+        // Simple HTML validation
+        const invalidTags = code.match(/<\/?\w+(?:\s+[\w\-:.]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[\w\-:.]+))?)*\s*\/?>/g) || [];
+        const openTags = [];
+        
+        for (const tag of invalidTags) {
+          const isClosing = tag.match(/<\//);
+          const tagName = tag.match(/<\/?(\w+)/)[1];
+          
+          if (!isClosing) {
+            if (!['img', 'input', 'br', 'hr', 'meta', 'link'].includes(tagName.toLowerCase())) {
+              openTags.push(tagName);
+            }
+          } else {
+            const lastOpenTag = openTags.pop();
+            if (lastOpenTag !== tagName) {
+              errors.push(`Mismatched HTML tags: expected </${lastOpenTag}>, got </${tagName}>`);
+            }
+          }
+        }
+        
+        if (openTags.length > 0) {
+          errors.push(`Unclosed HTML tags: ${openTags.join(', ')}`);
+        }
+      } else if (type === 'css') {
+        // Simple CSS validation
+        const rules = code.match(/[^{]+\{[^}]*\}/g) || [];
+        
+        for (const rule of rules) {
+          const selectors = rule.match(/[^{]+/)[0].trim();
+          const declarations = rule.match(/\{([^}]*)\}/)[1];
+          
+          const invalidProps = declarations.match(/[^:;]+:[^;]+(?=;|$)/g) || [];
+          for (const prop of invalidProps) {
+            if (!prop.match(/^\s*[\w-]+\s*:\s*.+\s*$/)) {
+              warnings.push(`Potentially invalid CSS property declaration: "${prop.trim()}"`);
+            }
+          }
+        }
+      } else if (type === 'js') {
+        // Simple JS validation
+        try {
+          // Try to find some common JS syntax errors
+          if (code.includes('if(') || code.includes('for(') || code.includes('while(')) {
+            warnings.push('Consider adding a space after if, for, while, etc.');
+          }
+          
+          // Check for missing semicolons
+          const lines = code.split('\n');
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line && !line.endsWith(';') && !line.endsWith('{') && !line.endsWith('}') && 
+                !line.endsWith(':') && !line.startsWith('//') && !line.startsWith('/*') && 
+                !line.startsWith('*') && !line.startsWith('function') && !line.endsWith('*/')) {
+              warnings.push(`Line ${i + 1} might be missing a semicolon`);
+            }
+          }
+          
+          // Try to evaluate the code (in a function to catch syntax errors)
+          new Function(code);
+        } catch (e) {
+          errors.push(`JavaScript error: ${e.message}`);
+        }
+      }
+      
+      // Display validation results in console
+      logToConsole('=== Validation Results ===', 'info');
+      logToConsole(`Validating ${type.toUpperCase()} code...`, 'info');
+      
+      if (errors.length === 0 && warnings.length === 0) {
+        logToConsole(`✓ No issues found in ${type.toUpperCase()} code!`, 'info');
+      } else {
+        if (errors.length > 0) {
+          logToConsole(`Found ${errors.length} error(s):`, 'error');
+          errors.forEach((error, index) => {
+            logToConsole(`${index + 1}. ${error}`, 'error');
+          });
+        }
+        
+        if (warnings.length > 0) {
+          logToConsole(`Found ${warnings.length} warning(s):`, 'warn');
+          warnings.forEach((warning, index) => {
+            logToConsole(`${index + 1}. ${warning}`, 'warn');
+          });
+        }
+      }
+      
+      // Show console if it's not already visible
+      consoleElement.style.display = 'block';
+    }
+
+    // Log to console with timestamp
+    function logToConsole(message, type = 'info') {
+      const time = new Date().toLocaleTimeString();
+      const logItem = document.createElement('div');
+      logItem.className = 'log-item';
+      
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'log-time';
+      timeSpan.textContent = time;
+      
+      const messageSpan = document.createElement('span');
+      messageSpan.className = `console-${type}`;
+      messageSpan.textContent = message;
+      
+      logItem.appendChild(timeSpan);
+      logItem.appendChild(messageSpan);
+      
+      consoleContent.appendChild(logItem);
+      
+      // Auto-scroll
+      consoleContent.scrollTop = consoleContent.scrollHeight;
+    }
+
+    // Update the preview iframe with intercept for console logs
+    function updatePreview() {
+      const html = htmlEditor.getValue();
+      const css = cssEditor.getValue();
+      const js = jsEditor.getValue();
+
+      // Clear console for new run
+      consoleContent.innerHTML = '';
+      logToConsole('=== New Run ===', 'info');
+
+      const previewDocument = preview.contentDocument || preview.contentWindow.document;
+      
+      // Clear the document
+      previewDocument.open();
+
+      // Prepare console interceptor script
+      const consoleInterceptor = `
+        <script>
+          (function() {
+            // Save the original console methods
+            const originalConsole = {
+              log: console.log,
+              warn: console.warn,
+              error: console.error,
+              info: console.info
+            };
+            
+            // Function to send logs to parent window
+            function sendToParent(type, args) {
+              window.parent.postMessage({
+                source: 'preview-console',
+                type: type,
+                args: Array.from(args).map(arg => {
+                  if (typeof arg === 'object') {
+                    try {
+                      return JSON.stringify(arg);
+                    } catch(e) {
+                      return String(arg);
+                    }
+                  }
+                  return String(arg);
+                })
+              }, '*');
+              
+              // Call the original console method
+              originalConsole[type].apply(console, args);
+            }
+            
+            // Override console methods
+            console.log = function() { sendToParent('log', arguments); };
+            console.warn = function() { sendToParent('warn', arguments); };
+            console.error = function() { sendToParent('error', arguments); };
+            console.info = function() { sendToParent('info', arguments); };
+            
+            // Catch unhandled errors
+            window.addEventListener('error', function(e) {
+              sendToParent('error', [e.message + ' at line ' + e.lineno + ' in ' + e.filename]);
+              return false;
+            });
+          })();
+        </script>
+      `;
+
+      // Write the content with console interceptor
+      previewDocument.write(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>${css}</style>
+          ${consoleInterceptor}
+        </head>
+        <body>
+          ${html}
+          <script>${js}</script>
+        </body>
+        </html>
+      `);
+
+      previewDocument.close();
+    }
+
+    // Listen for messages from the iframe
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.source === 'preview-console') {
+        const { type, args } = event.data;
+        
+        // Join arguments for display
+        const message = args.join(' ');
+        
+        // Display in our console with appropriate styling
+        logToConsole(message, type);
+        
+        // Auto-show console for errors
+        if (type === 'error') {
+          consoleElement.style.display = 'block';
+        }
+      }
+    });
+
+    // Auto-update preview with debounce
+    let timeout;
+    [htmlEditor, cssEditor, jsEditor].forEach(editor => {
+      editor.on('change', () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(updatePreview, 1000);
+      });
+    });
+  </script>
+</body>
+</html>
