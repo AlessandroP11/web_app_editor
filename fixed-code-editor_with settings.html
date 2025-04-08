@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced Code Editor</title>
+  <!-- CodeMirror for syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/css/css.min.js"></script>
+  
+  <!-- jQuery UI for draggable functionality -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css">
+  <!-- Add JSZip CDN in the head -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    body {
+      background-color: #282a36;
+      color: #f8f8f2;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .navbar {
+      background-color: #44475a;
+      color: #f8f8f2;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .workspace {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      padding: 1rem;
+    }
+
+    .panel {
+      position: absolute;
+      background-color: #383a4e;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      min-width: 300px;
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      resize: both;
+    }
+
+    .preview-panel {
+      top: 10px;
+      left: 10px;
+      width: calc(100% - 20px);
+      height: 45%;
+    }
+
+    .html-panel {
+      top: 50%;
+      left: 10px;
+      width: 32%;
+      height: 45%;
+    }
+
+    .css-panel {
+      top: 50%;
+      left: 34%;
+      width: 32%;
+      height: 45%;
+    }
+
+    .js-panel {
+      top: 50%;
+      left: 68%;
+      width: 32%;
+      height: 45%;
+    }
+
+    .panel-header {
+      background-color: #44475a;
+      padding: 0.75rem;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: move;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background-color: white;
+    }
+
+    .CodeMirror {
+      height: 100% !important;
+      font-size: 14px;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 5px;
+    }
+
+    button {
+      background-color: #50fa7b;
+      color: #282a36;
+      border: none;
+      padding: 0.25rem 0.75rem;
+      border-radius: 3px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background-color: #5af78e;
+      transform: translateY(-1px);
+    }
+
+    .reset-layout {
+      background-color: #ff79c6;
+    }
+
+    .reset-layout:hover {
+      background-color: #ff92d0;
+    }
+
+    .resize-handle {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 15px;
+      height: 15px;
+      cursor: nwse-resize;
+      background-color: #50fa7b;
+      clip-path: polygon(100% 0, 100% 100%, 0 100%);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <h1>Advanced Code Editor</h1>
+    <div>
+      <button id="run-all">Run All</button>
+      <button class="reset-layout">Reset Layout</button>
+      <button id="save-code">Save Code</button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div class="panel preview-panel" id="preview-panel">
+      <div class="panel-header">
+        Preview
+        <div class="panel-actions">
+          <button id="refresh-preview">Refresh</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <iframe id="preview"></iframe>
+      </div>
+      <div class="resize-handle"></div>
+    </div>
+
+    <div class="panel html-panel" id="html-panel">
+      <div class="panel-header">
+        HTML
+        <div class="panel-actions">
+          <button id="run-html">Run</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <textarea id="html-editor">&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;title&gt;My Page&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;Hello World!&lt;/h1&gt;
+  &lt;p&gt;Welcome to the interactive code editor.&lt;/p&gt;
+  &lt;div class="container"&gt;
+    &lt;button id="test-button"&gt;Click me!&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</textarea>
+      </div>
+      <div class="resize-handle"></div>
+    </div>
+
+    <div class="panel css-panel" id="css-panel">
+      <div class="panel-header">
+        CSS
+        <div class="panel-actions">
+          <button id="run-css">Run</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <textarea id="css-editor">body {
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+  padding: 20px;
+  color: #333;
+  background-color: #f9f9f9;
+}
+
+h1 {
+  color: #4CAF50;
+  text-align: center;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+button {
+  background-color: #008CBA;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+button:hover {
+  background-color: #005f7f;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}</textarea>
+      </div>
+      <div class="resize-handle"></div>
+    </div>
+
+    <div class="panel js-panel" id="js-panel">
+      <div class="panel-header">
+        JavaScript
+        <div class="panel-actions">
+          <button id="run-js">Run</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <textarea id="js-editor">// Wait for DOM to load
+document.addEventListener('DOMContentLoaded', function() {
+  // Get the button
+  const button = document.getElementById('test-button');
+  
+  if (button) {
+    button.addEventListener('click', function() {
+      // Show an alert
+      alert('Button clicked!');
+      
+      // Change heading color
+      const heading = document.querySelector('h1');
+      if (heading) {
+        heading.style.color = getRandomColor();
+        heading.textContent = 'Colors Changed!';
+      }
+      
+      // Add animation to the button
+      this.style.animation = 'pulse 0.5s';
+      setTimeout(() => {
+        this.style.animation = '';
+      }, 500);
+    });
+  }
+});
+
+// Generate random color
+function getRandomColor() {
+  const letters = '0123456789ABCDEF';
+  let color = '#';
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+}</textarea>
+      </div>
+      <div class="resize-handle"></div>
+    </div>
+  </div>
+
+  <script>
+
+    // Add a settings panel for user preferences
+    function initializeSettings() {
+      const settingsPanel = $('<div class="settings-panel"></div>').css({
+        position: "fixed",
+        top: "10px",
+        right: "10px",
+        backgroundColor: "#282a36", // Updated background color
+        color: "#f8f8f2",
+        padding: "10px",
+        borderRadius: "5px",
+        zIndex: 1000,
+        display: "none", // Initially hidden
+        boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)", // Added shadow for a modern look
+      });
+
+      settingsPanel.append('<h3>Settings</h3>');
+
+      // Theme selection
+      settingsPanel.append('<label for="editor-theme">Theme:</label>');
+      const themeSelect = $('<select id="editor-theme"></select>');
+      themeSelect.append('<option value="dark">Dark</option>');
+      themeSelect.append('<option value="light">Light</option>');
+      settingsPanel.append(themeSelect);
+
+      // Font size
+      settingsPanel.append('<label for="font-size">Font Size:</label>');
+      const fontSizeInput = $('<input type="number" id="font-size" min="10" max="30" value="14">');
+      settingsPanel.append(fontSizeInput);
+
+      // Toggle line numbers
+      settingsPanel.append('<label for="toggle-line-numbers">Show Line Numbers:</label>');
+      const lineNumbersToggle = $('<input type="checkbox" id="toggle-line-numbers" checked>');
+      settingsPanel.append(lineNumbersToggle);
+
+      $("body").append(settingsPanel);
+
+      // Apply theme change
+      themeSelect.on("change", function () {
+        const theme = $(this).val() === "light" ? "default" : "dracula";
+        htmlEditor.setOption("theme", theme);
+        cssEditor.setOption("theme", theme);
+        jsEditor.setOption("theme", theme);
+      });
+
+      // Apply font size change
+      fontSizeInput.on("input", function () {
+        const fontSize = `${$(this).val()}px`;
+        $(".CodeMirror").css("font-size", fontSize);
+      });
+
+      // Toggle line numbers
+      lineNumbersToggle.on("change", function () {
+        const showLineNumbers = $(this).is(":checked");
+        htmlEditor.setOption("lineNumbers", showLineNumbers);
+        cssEditor.setOption("lineNumbers", showLineNumbers);
+        jsEditor.setOption("lineNumbers", showLineNumbers);
+      });
+
+      // Close the settings panel when clicking outside
+      $(document).on("click", function (e) {
+        if (!$(e.target).closest(".settings-panel, #settings-button").length) {
+          $(".settings-panel").hide();
+        }
+      });
+    }
+
+    // Enable auto-save for code changes
+    function enableAutoSave() {
+      const autoSaveDelay = 2000; // Auto-save every 2 seconds
+      let autoSaveTimeout;
+
+      function saveCode() {
+        localStorage.setItem("htmlCode", htmlEditor.getValue());
+        localStorage.setItem("cssCode", cssEditor.getValue());
+        localStorage.setItem("jsCode", jsEditor.getValue());
+      }
+
+      [htmlEditor, cssEditor, jsEditor].forEach(editor => {
+        editor.on("change", function () {
+          clearTimeout(autoSaveTimeout);
+          autoSaveTimeout = setTimeout(saveCode, autoSaveDelay);
+        });
+      });
+
+      // Load saved code on page load
+      const savedHtml = localStorage.getItem("htmlCode");
+      const savedCss = localStorage.getItem("cssCode");
+      const savedJs = localStorage.getItem("jsCode");
+
+      if (savedHtml) htmlEditor.setValue(savedHtml);
+      if (savedCss) cssEditor.setValue(savedCss);
+      if (savedJs) jsEditor.setValue(savedJs);
+    }
+
+    // Toggle settings panel visibility
+    function toggleSettingsPanel() {
+      $(".settings-panel").toggle();
+    }
+
+    $(document).ready(function () {
+      initializeSettings();
+      enableAutoSave();
+
+      // Add a button to toggle the settings panel
+      const settingsButton = $('<button id="settings-button">Settings</button>').css({
+        marginLeft: "10px",
+        backgroundColor: "#ffb86c",
+      });
+      $(".navbar div").append(settingsButton);
+
+      // Attach click event to toggle settings panel
+      $("#settings-button").on("click", toggleSettingsPanel);
+    });
+
+    // Save layout position to localStorage
+    function saveLayout() {
+      const layout = {};
+      $(".panel").each(function () {
+        const id = $(this).attr("id");
+        layout[id] = {
+          top: $(this).css("top"),
+          left: $(this).css("left"),
+          width: $(this).css("width"),
+          height: $(this).css("height"),
+          zIndex: $(this).css("z-index")
+        };
+      });
+      localStorage.setItem("panelLayout", JSON.stringify(layout));
+    }
+
+    // Load layout position from localStorage
+    function loadLayout() {
+      const layout = JSON.parse(localStorage.getItem("panelLayout"));
+      if (layout) {
+        Object.keys(layout).forEach(id => {
+          const panel = $("#" + id);
+          const panelData = layout[id];
+          panel.css({
+            top: panelData.top,
+            left: panelData.left,
+            width: panelData.width,
+            height: panelData.height,
+            zIndex: panelData.zIndex
+          });
+        });
+      }
+    }
+
+    $(function () {
+      // Load layout on page load
+      loadLayout();
+
+      // Save layout whenever a panel is moved or resized
+      $(".panel").on("dragstop", saveLayout);
+      $(".panel").on("resizestop", saveLayout);
+
+      // Add a button to clear saved layout
+      $('<button id="clear-layout" class="reset-layout">Clear Layout</button>')
+        .insertAfter("#run-all")
+        .on("click", function () {
+          localStorage.removeItem("panelLayout");
+          resetLayout();
+        });
+    });
+    
+    // Initialize CodeMirror editors with syntax highlighting
+    const htmlEditor = CodeMirror.fromTextArea(document.getElementById("html-editor"), {
+      mode: "htmlmixed",
+      theme: "dracula",
+      lineNumbers: true,
+      autoCloseTags: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      indentUnit: 2
+    });
+
+    const cssEditor = CodeMirror.fromTextArea(document.getElementById("css-editor"), {
+      mode: "css",
+      theme: "dracula",
+      lineNumbers: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      indentUnit: 2
+    });
+
+    const jsEditor = CodeMirror.fromTextArea(document.getElementById("js-editor"), {
+      mode: "javascript",
+      theme: "dracula",
+      lineNumbers: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      indentUnit: 2
+    });
+
+    // Initialize preview
+    const preview = document.getElementById('preview');
+    
+    // Function to update preview
+    function updatePreview() {
+      const html = htmlEditor.getValue();
+      const css = cssEditor.getValue();
+      const js = jsEditor.getValue();
+
+      const previewDocument = preview.contentDocument || preview.contentWindow.document;
+      
+      // Clear the document
+      previewDocument.open();
+      
+      // Extract body content from HTML
+      let bodyContent = html;
+      const bodyMatch = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html);
+      if (bodyMatch && bodyMatch[1]) {
+        bodyContent = bodyMatch[1];
+      }
+
+      // Write the content
+      previewDocument.write(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>${css}</style>
+        </head>
+        <body>
+          ${bodyContent}
+          <script>${js}<\/script>
+        </body>
+        </html>
+      `);
+
+      previewDocument.close();
+    }
+
+    // Run the initial preview
+    setTimeout(updatePreview, 500);
+
+    // Make panels draggable with jQuery UI
+    $(function() {
+      $(".panel").draggable({
+        handle: ".panel-header",
+        containment: "parent",
+        start: function(event, ui) {
+          $(this).css('z-index', 10);
+          $('.panel').not(this).css('z-index', 1);
+        }
+      });
+
+      // Make panels resizable
+      $(".panel").resizable({
+        handles: "all",
+        minWidth: 250,
+        minHeight: 150,
+        containment: "parent"
+      });
+
+      // Event listeners for the run buttons
+      $('#run-html').on('click', updatePreview);
+      $('#run-css').on('click', updatePreview);
+      $('#run-js').on('click', updatePreview);
+      $('#run-all').on('click', updatePreview);
+      $('#refresh-preview').on('click', updatePreview);
+
+      // Reset layout button
+      $('.reset-layout').on('click', resetLayout);
+
+      // Auto-update preview with debounce
+      let timeout;
+      [htmlEditor, cssEditor, jsEditor].forEach(editor => {
+        editor.on('change', () => {
+          clearTimeout(timeout);
+          timeout = setTimeout(updatePreview, 1500);
+        });
+      });
+    });
+    
+    // Functionality to save code
+    document.getElementById('save-code').addEventListener('click', function() {
+  const zip = new JSZip();
+
+  // Add HTML file with proper references to CSS and JS
+  const htmlFileContent =
+    '<!DOCTYPE html>\n' +
+    '<html lang="en">\n' +
+    '<head>\n' +
+    '  <meta charset="UTF-8">\n' +
+    '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+    '  <title>My Page</title>\n' +
+    '  <link rel="stylesheet" href="styles.css">\n' +
+    '</head>\n' +
+    '<body>\n' +
+    htmlEditor.getValue() + '\n' +
+    '  <script src="script.js"><' + '/script>\n' + // Avoids premature ending of the script tag
+    '</body>\n' +
+    '</html>';
+
+  zip.file('index.html', htmlFileContent);
+
+  // Add CSS file
+  zip.file('styles.css', cssEditor.getValue());
+
+  // Add JavaScript file
+  zip.file('script.js', jsEditor.getValue());
+
+  // Generate the zip file and trigger the download
+  zip.generateAsync({ type: 'blob' }).then(function(content) {
+    saveAs(content, 'code-editor.zip');
+  });
+});
+
+    // Reset layout function
+    function resetLayout() {
+      $("#preview-panel").css({
+        top: "10px",
+        left: "10px",
+        width: "calc(100% - 20px)",
+        height: "45%",
+        zIndex: 1
+      });
+      
+      $("#html-panel").css({
+        top: "50%",
+        left: "10px",
+        width: "32%",
+        height: "45%",
+        zIndex: 1
+      });
+      
+      $("#css-panel").css({
+        top: "50%",
+        left: "34%",
+        width: "32%",
+        height: "45%",
+        zIndex: 1
+      });
+      
+      $("#js-panel").css({
+        top: "50%",
+        left: "68%",
+        width: "32%",
+        height: "45%",
+        zIndex: 1
+      });
+    }
+  </script>
+</body>
+</html>
