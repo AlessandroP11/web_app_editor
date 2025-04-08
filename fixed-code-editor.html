@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced Code Editor</title>
+  <!-- CodeMirror for syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/css/css.min.js"></script>
+  
+  <!-- jQuery UI for draggable functionality -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css">
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    body {
+      background-color: #282a36;
+      color: #f8f8f2;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .navbar {
+      background-color: #44475a;
+      color: #f8f8f2;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .workspace {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      padding: 1rem;
+    }
+
+    .panel {
+      position: absolute;
+      background-color: #383a4e;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      min-width: 300px;
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      resize: both;
+    }
+
+    .preview-panel {
+      top: 10px;
+      left: 10px;
+      width: calc(100% - 20px);
+      height: 45%;
+    }
+
+    .html-panel {
+      top: 50%;
+      left: 10px;
+      width: 32%;
+      height: 45%;
+    }
+
+    .css-panel {
+      top: 50%;
+      left: 34%;
+      width: 32%;
+      height: 45%;
+    }
+
+    .js-panel {
+      top: 50%;
+      left: 68%;
+      width: 32%;
+      height: 45%;
+    }
+
+    .panel-header {
+      background-color: #44475a;
+      padding: 0.75rem;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: move;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background-color: white;
+    }
+
+    .CodeMirror {
+      height: 100% !important;
+      font-size: 14px;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 5px;
+    }
+
+    button {
+      background-color: #50fa7b;
+      color: #282a36;
+      border: none;
+      padding: 0.25rem 0.75rem;
+      border-radius: 3px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background-color: #5af78e;
+      transform: translateY(-1px);
+    }
+
+    .reset-layout {
+      background-color: #ff79c6;
+    }
+
+    .reset-layout:hover {
+      background-color: #ff92d0;
+    }
+
+    .resize-handle {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 15px;
+      height: 15px;
+      cursor: nwse-resize;
+      background-color: #50fa7b;
+      clip-path: polygon(100% 0, 100% 100%, 0 100%);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <h1>Advanced Code Editor</h1>
+    <div>
+      <button id="run-all">Run All</button>
+      <button class="reset-layout">Reset Layout</button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div class="panel preview-panel" id="preview-panel">
+      <div class="panel-header">
+        Preview
+        <div class="panel-actions">
+          <button id="refresh-preview">Refresh</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <iframe id="preview"></iframe>
+      </div>
+      <div class="resize-handle"></div>
+    </div>
+
+    <div class="panel html-panel" id="html-panel">
+      <div class="panel-header">
+        HTML
+        <div class="panel-actions">
+          <button id="run-html">Run</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <textarea id="html-editor">&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;title&gt;My Page&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;Hello World!&lt;/h1&gt;
+  &lt;p&gt;Welcome to the interactive code editor.&lt;/p&gt;
+  &lt;div class="container"&gt;
+    &lt;button id="test-button"&gt;Click me!&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</textarea>
+      </div>
+      <div class="resize-handle"></div>
+    </div>
+
+    <div class="panel css-panel" id="css-panel">
+      <div class="panel-header">
+        CSS
+        <div class="panel-actions">
+          <button id="run-css">Run</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <textarea id="css-editor">body {
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+  padding: 20px;
+  color: #333;
+  background-color: #f9f9f9;
+}
+
+h1 {
+  color: #4CAF50;
+  text-align: center;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+button {
+  background-color: #008CBA;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+button:hover {
+  background-color: #005f7f;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}</textarea>
+      </div>
+      <div class="resize-handle"></div>
+    </div>
+
+    <div class="panel js-panel" id="js-panel">
+      <div class="panel-header">
+        JavaScript
+        <div class="panel-actions">
+          <button id="run-js">Run</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <textarea id="js-editor">// Wait for DOM to load
+document.addEventListener('DOMContentLoaded', function() {
+  // Get the button
+  const button = document.getElementById('test-button');
+  
+  if (button) {
+    button.addEventListener('click', function() {
+      // Show an alert
+      alert('Button clicked!');
+      
+      // Change heading color
+      const heading = document.querySelector('h1');
+      if (heading) {
+        heading.style.color = getRandomColor();
+        heading.textContent = 'Colors Changed!';
+      }
+      
+      // Add animation to the button
+      this.style.animation = 'pulse 0.5s';
+      setTimeout(() => {
+        this.style.animation = '';
+      }, 500);
+    });
+  }
+});
+
+// Generate random color
+function getRandomColor() {
+  const letters = '0123456789ABCDEF';
+  let color = '#';
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+}</textarea>
+      </div>
+      <div class="resize-handle"></div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize CodeMirror editors with syntax highlighting
+    const htmlEditor = CodeMirror.fromTextArea(document.getElementById("html-editor"), {
+      mode: "htmlmixed",
+      theme: "dracula",
+      lineNumbers: true,
+      autoCloseTags: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      indentUnit: 2
+    });
+
+    const cssEditor = CodeMirror.fromTextArea(document.getElementById("css-editor"), {
+      mode: "css",
+      theme: "dracula",
+      lineNumbers: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      indentUnit: 2
+    });
+
+    const jsEditor = CodeMirror.fromTextArea(document.getElementById("js-editor"), {
+      mode: "javascript",
+      theme: "dracula",
+      lineNumbers: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      indentUnit: 2
+    });
+
+    // Initialize preview
+    const preview = document.getElementById('preview');
+    
+    // Function to update preview
+    function updatePreview() {
+      const html = htmlEditor.getValue();
+      const css = cssEditor.getValue();
+      const js = jsEditor.getValue();
+
+      const previewDocument = preview.contentDocument || preview.contentWindow.document;
+      
+      // Clear the document
+      previewDocument.open();
+      
+      // Extract body content from HTML
+      let bodyContent = html;
+      const bodyMatch = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html);
+      if (bodyMatch && bodyMatch[1]) {
+        bodyContent = bodyMatch[1];
+      }
+
+      // Write the content
+      previewDocument.write(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>${css}</style>
+        </head>
+        <body>
+          ${bodyContent}
+          <script>${js}<\/script>
+        </body>
+        </html>
+      `);
+
+      previewDocument.close();
+    }
+
+    // Run the initial preview
+    setTimeout(updatePreview, 500);
+
+    // Make panels draggable with jQuery UI
+    $(function() {
+      $(".panel").draggable({
+        handle: ".panel-header",
+        containment: "parent",
+        start: function(event, ui) {
+          $(this).css('z-index', 10);
+          $('.panel').not(this).css('z-index', 1);
+        }
+      });
+
+      // Make panels resizable
+      $(".panel").resizable({
+        handles: "all",
+        minWidth: 250,
+        minHeight: 150,
+        containment: "parent"
+      });
+
+      // Event listeners for the run buttons
+      $('#run-html').on('click', updatePreview);
+      $('#run-css').on('click', updatePreview);
+      $('#run-js').on('click', updatePreview);
+      $('#run-all').on('click', updatePreview);
+      $('#refresh-preview').on('click', updatePreview);
+
+      // Reset layout button
+      $('.reset-layout').on('click', resetLayout);
+
+      // Auto-update preview with debounce
+      let timeout;
+      [htmlEditor, cssEditor, jsEditor].forEach(editor => {
+        editor.on('change', () => {
+          clearTimeout(timeout);
+          timeout = setTimeout(updatePreview, 1500);
+        });
+      });
+    });
+
+    // Reset layout function
+    function resetLayout() {
+      $("#preview-panel").css({
+        top: "10px",
+        left: "10px",
+        width: "calc(100% - 20px)",
+        height: "45%",
+        zIndex: 1
+      });
+      
+      $("#html-panel").css({
+        top: "50%",
+        left: "10px",
+        width: "32%",
+        height: "45%",
+        zIndex: 1
+      });
+      
+      $("#css-panel").css({
+        top: "50%",
+        left: "34%",
+        width: "32%",
+        height: "45%",
+        zIndex: 1
+      });
+      
+      $("#js-panel").css({
+        top: "50%",
+        left: "68%",
+        width: "32%",
+        height: "45%",
+        zIndex: 1
+      });
+    }
+  </script>
+</body>
+</html>
